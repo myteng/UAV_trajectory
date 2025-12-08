@@ -16,11 +16,19 @@ import os.path as osp
 
 def evaluate_policy_ddpg(env, agent, times, state_norm):
     rewards = 0
+    r_time_sum = 0
+    r_energy_sum = 0
+    r_penalty_sum = 0
+    r_task_success_sum = 0
 
     for t in range(times):
         state = env.reset()
 
         episode_reward = []
+        episode_r_time = []
+        episode_r_energy = []
+        episode_r_penalty = []
+        r_task_success = 0
 
         for step in range(1000):
             # 归一化当前状态
@@ -33,10 +41,13 @@ def evaluate_policy_ddpg(env, agent, times, state_norm):
             # print(f"action = {action}")
 
             # 与环境交互
-            reward, next_state, is_terminal = env.step_evaluate(action)
+            reward, r_time, r_energy, r_penalty, r_task_success, next_state, is_terminal = env.step_evaluate(action)
             # print(f"reward: {reward}, reward_scal: {reward_scal(reward)}")
 
             episode_reward.append(reward)
+            episode_r_time.append(r_time)
+            episode_r_energy.append(r_energy)
+            episode_r_penalty.append(r_penalty)
 
             if is_terminal:
                 break
@@ -44,11 +55,14 @@ def evaluate_policy_ddpg(env, agent, times, state_norm):
 
         rewards_sum = sum(episode_reward)
         rewards_avg = np.round(rewards_sum / len(episode_reward), 2)
-        # print(f"len(episode_reward) = {len(episode_reward)}")
+        r_time_sum += sum(episode_r_time)
+        r_energy_sum += sum(episode_r_energy)
+        r_penalty_sum += sum(episode_r_penalty)
+        r_task_success_sum += r_task_success
 
         rewards += rewards_sum
 
-    return rewards / times
+    return rewards / times, r_time_sum / times, r_energy_sum / times, r_penalty_sum / times, r_task_success_sum / times
 
 
 def run_evaluate_ddpg(epoch, time, log_dir_bp, seed):
@@ -58,7 +72,7 @@ def run_evaluate_ddpg(epoch, time, log_dir_bp, seed):
     # Environment
     env = Environment()
     state_size = (env.n_uav, env.n_feature)
-    action_size = env.n_uav + 1
+    action_size = env.n_uav
 
     # Agent
     agent_ddpg = DDPGAgent(state_size, action_size)
@@ -74,23 +88,15 @@ def run_evaluate_ddpg(epoch, time, log_dir_bp, seed):
     state_norm = Normalize(shape=state_size)
     # reward_norm = Normalize(shape=4)
 
-    reward_avg_evaluate_ddpg = evaluate_policy_ddpg(env, agent_ddpg, time, state_norm)
+    reward_avg_evaluate_ddpg, reward_avg_time, reward_avg_energy, reward_avg_penalty, reward_task_success = evaluate_policy_ddpg(env, agent_ddpg, time, state_norm)
 
     reward_avg_evaluate_ddpg = np.round(reward_avg_evaluate_ddpg, 2)
-    # reward_avg_time = np.round(-reward_avg_time, 2)
-    # reward_avg_load = np.round(-reward_avg_load, 2)
-    # reward_avg_success = np.round(reward_avg_success, 2)
-    # reward_avg_energy = np.round(-reward_avg_energy, 2)
-    # reward_avg_rate = np.round(reward_avg_success * 100 / (reward_avg_time + reward_avg_energy + reward_avg_energy), 2)
+    reward_avg_time = np.round(reward_avg_time, 2)
+    reward_avg_energy = np.round(reward_avg_energy, 2)
+    reward_avg_penalty = np.round(reward_avg_penalty, 2)
+    reward_avg_task_success = np.round(reward_task_success, 2)
 
-    if args_env.use_potential_reward:
-        print(f"DDPG algorithm: average reward evaluate, {reward_avg_evaluate_ddpg}")
-    else:
-        print(f"DDPG_no_potential algorithm: average reward evaluate, {reward_avg_evaluate_ddpg}")
+    return reward_avg_evaluate_ddpg, reward_avg_time, reward_avg_energy, reward_avg_penalty, reward_avg_task_success
 
-    # print(
-    #     f"DDPG algorithm: average reward evaluate, {reward_avg_evaluate_ppo}, execution time, {reward_avg_time}, load, {reward_avg_load}, success, {reward_avg_success}, energy, {reward_avg_energy}, rate, {reward_avg_rate}")
-
-    return reward_avg_evaluate_ddpg
 
 

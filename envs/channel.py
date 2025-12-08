@@ -6,17 +6,11 @@ from parameter.paramEnv import *
 
 
 class Channel(object):
-    # chan_params = {
-    #     'suburban': (4.88, 0.43, 0.1, 21),
-    #     'urban': (9.61, 0.16, 1, 20),
-    #     'dense-urban': (12.08, 0.11, 1.6, 23),
-    #     'high-rise-urban': (27.23, 0.08, 2.3, 34)
-    # }
     chan_params = {
-        'suburban': (0.8, 0.2, 0.1, 21),
-        'urban': (0.5, 0.5, 1, 20),
-        'dense-urban': (0.4, 0.6, 1.6, 23),
-        'high-rise-urban': (0.2, 0.8, 2.3, 34)
+        'suburban': (4.88, 0.43, 0.1, 21),
+        'urban': (9.61, 0.16, 1, 20),
+        'dense-urban': (12.08, 0.11, 1.6, 23),
+        'high-rise-urban': (27.23, 0.08, 2.3, 34)
     }
 
     def __init__(self):
@@ -58,13 +52,8 @@ class Channel(object):
                 # Path loss is the LoS cases.
                 pl = fspl * 10 ** (self.eta_los / 20)
         else:
-            is_blocked = self.obs_map.is_path_blocked_3d(pos_1, pos_2)
-            if is_blocked:
-                pl = fspl * 10 ** (self.eta_nlos / 20)
-            else:
-                pl = fspl * 10 ** (self.eta_nlos / 20)
-            # # Path loss is the weighted average of LoS and NLoS cases.
-            # pl = self.p_los * fspl * 10 ** (self.eta_los / 20) + self.p_nlos * fspl * 10 ** (self.eta_nlos / 20)
+            # Path loss is the weighted average of LoS and NLoS cases.
+            pl = self.p_los * fspl * 10 ** (self.eta_los / 20) + self.p_nlos * fspl * 10 ** (self.eta_nlos / 20)
 
         # Get channel gain
         gain = 1 / pl
@@ -76,14 +65,15 @@ class Channel(object):
         if d >= self.max_dis:
             rate = 0
         else:
-            gain = self.get_gain(uav_1.pos, uav_2.pos)
-
-            # Get SNR
-            p_tx = 1e-3 * np.power(10, uav_1.p_tx / 10)  # Tx power (Watt)  10dbm转换为Watt
-            snr = p_tx * gain / (self.no * self.bw)
-
-            # link rate (Mbps)
-            rate = self.bw * np.log2(1 + snr) * 1e-6
+            # gain = self.get_gain(uav_1.pos, uav_2.pos)
+            #
+            # # Get SNR
+            # p_tx = 1e-3 * np.power(10, uav_1.p_tx / 10)  # Tx power (Watt)  10dbm转换为Watt
+            # snr = p_tx * gain / (self.no * self.bw)
+            #
+            # # link rate (Mbps)
+            # rate = self.bw * np.log2(1 + snr) * 1e-6
+            rate = 0.1 * d
 
         return rate
 

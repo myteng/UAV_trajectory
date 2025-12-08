@@ -21,6 +21,7 @@ class UAV(object):
         self.comp_energy_coef = args_env.comp_energy_coef  # η_comp
         self.hov_energy_coef = args_env.hov_energy_coef  # η_recv
         self.send_energy_coef = args_env.send_energy_coef  # η_send
+        self.turn_energy_coef = args_env.turn_energy_coef  # η_recv
 
         # 表示UAV上一个时隙的移动轨迹
         self.move_x = None

@@ -39,14 +39,14 @@ parser.add_argument('--n_uav', type=int, default=9,
 parser.add_argument('--max_energy_uav', type=int, default=500,
                     help='The maximum Energy of UAV (default: 100)')
 # - Velocities -
-parser.add_argument('--vels_uav', type=int, default=10,
+parser.add_argument('--vels_uav', type=int, default=5,
                     help='The Velocities of UAVs (m/s) (default: 10)')
 # - Transmission Power (dbm) -
 parser.add_argument('--p_tx_uav_min', type=int, default=10,
                     help='The min transmission power of UAVs (default: 10dbm)')
 parser.add_argument('--p_tx_uav_max', type=int, default=20,
                     help='The max transmission power of UAVs (default: 20dbm)')
-parser.add_argument('--max_distance', type=int, default=150,
+parser.add_argument('--max_distance', type=int, default=50,
                     help='The max transmission distance between UAVs (default: 150m)')
 # - Computing Power（MHz）-
 parser.add_argument('--p_cm_uav_min', type=int, default=50,
@@ -54,13 +54,15 @@ parser.add_argument('--p_cm_uav_min', type=int, default=50,
 parser.add_argument('--p_cm_uav_max', type=int, default=100,
                     help='The max computing power of UAVs（MHz） (default: 100)')
 # Energy Consumption Coefficient
-parser.add_argument('--fly_energy_coef', type=float, default=1.0,
+parser.add_argument('--fly_energy_coef', type=float, default=0.005,
                     help='The fly energy consumption coefficient of UAVs（） (default: 1.0)')
-parser.add_argument('--hov_energy_coef', type=float, default=0.1,
+parser.add_argument('--hov_energy_coef', type=float, default=2,
                     help='The hovering energy consumption coefficient of UAVs（） (default: 1.0)')
-parser.add_argument('--comp_energy_coef', type=float, default=1e-6,
+parser.add_argument('--turn_energy_coef', type=float, default=0.5,
+                    help='The turn energy consumption coefficient of UAVs（） (default: 1.0)')
+parser.add_argument('--comp_energy_coef', type=float, default=1e-5,
                     help='The computing energy consumption coefficient of UAVs（） (default: 1.0)')
-parser.add_argument('--send_energy_coef', type=float, default=0.1,
+parser.add_argument('--send_energy_coef', type=float, default=1,
                     help='The send energy consumption coefficient of UAVs（） (default: 1.0)')
 
 parser.add_argument('--max_parallel_tasks', type=int, default=5,
@@ -104,9 +106,9 @@ parser.add_argument('--data_size_min', type=int, default=500,
                     help='The Minimum Data Size between Tasks (KB) (default: 500)')
 parser.add_argument('--data_size_max', type=int, default=1000,
                     help='The Maximum Data Size between Tasks (KB) (default: 1000)')
-parser.add_argument('--deadline_min', type=int, default=300,
+parser.add_argument('--deadline_min', type=int, default=100,
                     help='The Minimum Limited Delay Time (s) (default: 10)')
-parser.add_argument('--deadline_max', type=int, default=500,
+parser.add_argument('--deadline_max', type=int, default=200,
                     help='The Maximum Limited Delay Time (s) (default: 40)')
 parser.add_argument('--n_task_min', type=int, default=1,
                     help='The Minimum Number of Tasks (default: 1)')

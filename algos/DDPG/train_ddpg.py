@@ -1,4 +1,6 @@
 import datetime
+import math
+
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from matplotlib import pyplot as plt
@@ -21,7 +23,7 @@ def training_ddpg(epochs, log_dir_log, log_dir_bp):
     env = Environment()
 
     state_size = (env.n_uav, env.n_feature)
-    action_size = env.n_uav + 1
+    action_size = env.n_uav
 
     agent = DDPGAgent(state_size, action_size)
 
@@ -99,8 +101,8 @@ if __name__ == '__main__':
     args_env.ranges_x = ranges_1[0]
     args_env.ranges_y = ranges_1[1]
     args_env.n_uav = 9
-    args_env.n_jobs = 30
-    args_env.use_potential_reward = False
+    args_env.n_jobs = 50
+    args_env.use_potential_reward = True
 
     if args_env.use_potential_reward:
         log_dir_log = "/Users/tengman/Documents/Python/UAVTrajectory/pythonProject1103/log_data/ddpg/"
@@ -109,7 +111,7 @@ if __name__ == '__main__':
         log_dir_log = "/Users/tengman/Documents/Python/UAVTrajectory/pythonProject1103/log_data/ddpg_no_potential/"
         log_dir_bp = "/Users/tengman/Documents/Python/UAVTrajectory/pythonProject1103/log_bp_data/ddpg_no_potential/"
 
-    epoch_set, rewards_set = training_ddpg(1000, log_dir_log, log_dir_bp)
+    epoch_set, rewards_set = training_ddpg(800, log_dir_log, log_dir_bp)
     plt.figure(figsize=(8, 6))
     plt.plot(epoch_set, rewards_set, label='DDPG', color='blue')
     plt.xlabel('Episode')

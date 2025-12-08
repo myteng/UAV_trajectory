@@ -220,7 +220,7 @@ class DDPGAgent:
             import torch.serialization
             torch.serialization.add_safe_globals([np._core.multiarray._reconstruct])
             checkpoint = th.load(path, map_location='cpu', weights_only=True)
-            print(f" Safe-load fallback triggered due to {e}")
+            # print(f" Safe-load fallback triggered due to {e}")
 
         epoch = checkpoint.get('epoch', 0)
         self.actor.set_weights(checkpoint['actor_weights'])
@@ -236,7 +236,7 @@ class DDPGAgent:
         else:
             self.target_critic.set_weights(self.critic.get_weights())
 
-        print(f"Checkpoint loaded from {path} at step {epoch}")
+        # print(f"Checkpoint loaded from {path} at step {epoch}")
 
     # -------- 与环境交互的便捷封装（可选）--------
     def remember(self, state, action, reward, next_state, done):

@@ -17,6 +17,8 @@ class Job(object):
         self.deadline = random.randint(args_env.deadline_min, args_env.deadline_max)  # d_j
         self.deadline_max = random.randint(args_env.deadline_min, args_env.deadline_max)  # d_j
         self.status = True  # job的状态，True表示当前时刻可以执行，False表示当前时刻不能执行
+        self.finish = False  # Job是否执行完
+        self.start = False  # Job是否开始执行
 
         # ---- 任务数与静态需求 ----
         self.n_task = random.randint(args_env.n_task_min, args_env.n_task_max)  # The Number of Tasks
@@ -41,7 +43,7 @@ class Job(object):
 
         self.uav_request = [-1 for _ in range(self.n_task)]  # task的发送UAV
         self.uav_offload = [-1 for _ in range(self.n_task)]  # task的卸载UAV
-        self.uav_request[0] = self.lab
+        # self.uav_request[0] = self.lab
 
         self.curr_task_id = 0
         self.start_time = [-1 for _ in range(self.n_task)]  # 实际开始执行时间

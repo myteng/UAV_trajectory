@@ -43,7 +43,12 @@ class Map(object):
         return np.array([self.pos_set[uav_id][0], self.pos_set[uav_id][1], self.h_uav])
 
     def init_jobs_position(self, job_id):
-        lab = random.randint(0, self.n_grids - 1)
+        r = random.random()  # 0~1 之间的随机数
+        if r < 0.8:
+            lab = random.choice([0, 1, 3, 4])
+        else:
+            lab = random.choice([2, 5, 6, 7, 8])
+        # lab = random.randint(0, self.n_grids - 1)
         self.lab_jobs[job_id] = lab
         center_pos = self.pos_set[int(self.lab_jobs[job_id])]
         pos_x = random.randint(int(center_pos[0] - self.range_pos / 2), int(center_pos[0] + self.range_pos / 2))
