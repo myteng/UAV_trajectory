@@ -5,6 +5,39 @@ class TXT_FILE(object):
     def __init__(self):
         self.path_pro = '/Users/tengman/Documents/Python/UAVTrajectory/pythonProject1103/results_data/'
 
+    # 保存Job位置
+    def save_job_position(self, obj, n_job):
+        file_name = os.path.join(self.path_pro, 'jobs_pos.txt')
+
+        with open(file_name, 'a') as file_obj:  # 使用 w 自动清空文件
+            for j in range(n_job):
+                file_obj.write(
+                    "job_id: {:d}, job_pos: {}, job_lab: {:d}\n".format(
+                        obj[j].id, obj[j].pos, obj[j].lab
+                    )
+                )
+
+    # 保存UAV位置
+    def save_uav_position(self, times, step, obj, n_uav):
+        file_name = os.path.join(self.path_pro, 'uav_pos.txt')
+
+        with open(file_name, 'a') as file_obj:  # 使用 w 自动清空文件
+            for u in range(n_uav):
+                file_obj.write(
+                    "Time:{:d}, step:{:d}, uav_id:{:d}, uav_pos:{}, uav_lab:{:d}\n".format(
+                        times, step, obj[u].id, obj[u].pos, int(obj[u].lab))
+                )
+
+    def clear_pos(self):
+        file_name_uav = os.path.join(self.path_pro, 'jobs_pos.txt')
+        file_name_gts = os.path.join(self.path_pro, 'uav_pos.txt')
+        # 清空文件内容
+        with open(file_name_uav, 'w') as file_obj_uav:
+            pass  # 仅仅打开并关闭文件，以清空文件内容
+        # 清空文件内容
+        with open(file_name_gts, 'w') as file_obj_gts:
+            pass  # 仅仅打开并关闭文件，以清空文件内容
+
     # 保存UAV、Job、GT特征
     def save_pro_txt(self, obj, label, time):
         # 保存Jobs属性

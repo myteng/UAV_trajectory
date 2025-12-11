@@ -26,6 +26,90 @@ class ReplayBuffer:
         return len(self.buffer)
 
 
+class PrioritizedReplayBuffer:
+    """
+    优先经验回放（Prioritized Experience Replay, PER）
+
+    简化实现：
+    - 使用一个 list 存储 transition，一个 list 存储对应的 priority。
+    - 采样时按 p_i^alpha 归一化为概率分布进行随机采样。
+    - 提供重要性采样权重 IS weights 以减小偏差。
+    """
+
+    def __init__(self, capacity=int(1e6), alpha: float = 0.6):
+        self.capacity = capacity
+        self.buffer = []
+        self.priorities = []
+        self.pos = 0
+        self.alpha = alpha  # 控制优先程度，0 表示退化为均匀采样
+
+    def push(self, state, action, reward, next_state, done):
+        max_prio = max(self.priorities) if self.priorities else 1.0
+
+        transition = (
+            np.array(state, copy=False),
+            np.array(action, copy=False),
+            float(reward),
+            np.array(next_state, copy=False),
+            float(done),
+        )
+
+        if len(self.buffer) < self.capacity:
+            self.buffer.append(transition)
+            self.priorities.append(max_prio)
+        else:
+            self.buffer[self.pos] = transition
+            self.priorities[self.pos] = max_prio
+            self.pos = (self.pos + 1) % self.capacity
+
+    def sample(self, batch_size, beta: float = 0.4):
+        """返回带优先级的 batch 和 IS 权重。
+
+        返回：
+            states, actions, rewards, next_states, dones, indices, is_weights
+        """
+        if len(self.buffer) == 0:
+            raise ValueError("PrioritizedReplayBuffer is empty")
+
+        prios = np.array(self.priorities, dtype=np.float32)
+        # 计算采样概率分布
+        probs = prios ** self.alpha
+        probs_sum = probs.sum()
+        if probs_sum <= 0:
+            # 极端情况保护：退化为均匀采样
+            probs = np.full_like(probs, 1.0 / len(probs))
+        else:
+            probs /= probs_sum
+
+        indices = np.random.choice(len(self.buffer), batch_size, p=probs)
+        batch = [self.buffer[idx] for idx in indices]
+        states, actions, rewards, next_states, dones = map(np.array, zip(*batch))
+
+        # 重要性采样权重
+        N = len(self.buffer)
+        weights = (N * probs[indices]) ** (-beta)
+        weights /= weights.max()  # 归一化到 [0,1]
+
+        return (
+            states,
+            actions,
+            rewards.reshape(-1, 1),
+            next_states,
+            dones.reshape(-1, 1),
+            indices,
+            weights.reshape(-1, 1),
+        )
+
+    def update_priorities(self, indices, td_errors, eps: float = 1e-6):
+        """根据 TD error 更新对应 transition 的 priority。"""
+        td_errors = np.abs(np.asarray(td_errors)) + eps
+        for idx, err in zip(indices, td_errors):
+            self.priorities[int(idx)] = float(err)
+
+    def __len__(self):
+        return len(self.buffer)
+
+
 class DDPGAgent:
     def __init__(self, state_dim, action_dim):
         # ---- 参数命名 ----
@@ -34,14 +118,22 @@ class DDPGAgent:
         self.update_epochs = 1              # DDPG 每一步更新一次（也可按需多步），默认 1
         self.learning_rate = 1e-4
         self.gamma = 0.99
-        # self.lam = 0.95                    # DDPG 不使用，但保留字段以“参数一致”
+        # self.lam = 0.95                      # DDPG 不使用，但保留字段以“参数一致”
         self.horizon = 28                    # 用作默认的 batch_size
         self.hidden_sizes = (64, 64)
 
         # DDPG 相关新增超参
         self.tau = 0.005                     # 软更新系数
-        self.noise_std = 0.1                 # 探索噪声（训练时用）
-        self.replay = ReplayBuffer(capacity=int(1e6))  # Off-policy 经验池
+        self.noise_std = 0.3                 # 探索噪声（训练时用）
+
+        # ---- 经验回放：使用优先经验回放（PER） ----
+        # alpha 控制优先采样程度（0 表示退化为均匀采样）
+        self.per_alpha = 0.6
+        # beta 控制重要性采样权重，训练过程中通常从较小值逐渐增大到 1.0
+        self.per_beta = 0.4
+        self.per_beta_increment = 1e-4
+
+        self.replay = PrioritizedReplayBuffer(capacity=int(1e6), alpha=self.per_alpha)
         self.min_replay_for_update = max(1000, 10 * self.horizon)  # 开始训练前需的最小经验量
 
         # 动作缩放（α∈(0,1)，θ∈[0,2π)）
@@ -66,7 +158,8 @@ class DDPGAgent:
     def build_actor(self, hidden_sizes):
         # 输出为 (-1,1) 的 u，经线性缩放映射到目标动作区间
         model = tf.keras.Sequential()
-        model.add(tf.keras.layers.InputLayer(shape=self.state_dim))
+        # model.add(tf.keras.layers.InputLayer(shape=self.state_dim))
+        model.add(tf.keras.layers.InputLayer(input_shape=self.state_dim))
         model.add(tf.keras.layers.Flatten())
         for h in hidden_sizes:
             model.add(tf.keras.layers.Dense(h, activation='relu'))
@@ -128,7 +221,7 @@ class DDPGAgent:
 
     # -------- 训练更新（从 ReplayBuffer 采样）--------
     @tf.function
-    def _train_step(self, states, actions, rewards, next_states, dones):
+    def _train_step(self, states, actions, rewards, next_states, dones, is_weights):
         # 目标动作与 Q 目标
         next_u = self.target_actor(next_states)                    # (-1,1)
         next_a = self._squash_and_scale(next_u)
@@ -136,10 +229,11 @@ class DDPGAgent:
         target_q = self.target_critic([next_states, next_a])
         y = rewards + (1.0 - dones) * self.gamma * target_q
 
-        # 更新 Critic：最小化 (Q - y)^2
+        # 更新 Critic：最小化加权 (Q - y)^2，这里的 is_weights 是 PER 的重要性采样权重
         with tf.GradientTape() as tape:
             q = self.critic([states, actions])
-            critic_loss = tf.reduce_mean(tf.square(q - tf.stop_gradient(y)))
+            td_errors = q - tf.stop_gradient(y)
+            critic_loss = tf.reduce_mean(is_weights * tf.square(td_errors))
         critic_grads = tape.gradient(critic_loss, self.critic.trainable_variables)
         self.critic_optimizer.apply_gradients(zip(critic_grads, self.critic.trainable_variables))
 
@@ -153,7 +247,8 @@ class DDPGAgent:
         actor_grads = tape.gradient(actor_loss, self.actor.trainable_variables)
         self.actor_optimizer.apply_gradients(zip(actor_grads, self.actor.trainable_variables))
 
-        return actor_loss, actor_grads, critic_loss, critic_grads
+        # 这里额外返回 td_errors，供 PER 更新 priority 使用
+        return actor_loss, actor_grads, critic_loss, critic_grads, td_errors
 
     def update(self):
         """
@@ -166,9 +261,20 @@ class DDPGAgent:
         if len(self.replay) < self.min_replay_for_update:
             return None, None, None, None
 
+        # PER 中 beta 随训练逐渐增大，减小采样偏差
+        self.per_beta = min(1.0, self.per_beta + self.per_beta_increment)
+
         # 这里用 horizon 作为 batch_size，保持“参数名一致”的风格
         batch_size = self.horizon
-        states, actions, rewards, next_states, dones = self.replay.sample(batch_size)
+        (
+            states,
+            actions,
+            rewards,
+            next_states,
+            dones,
+            indices,
+            is_weights,
+        ) = self.replay.sample(batch_size, beta=self.per_beta)
 
         # 转为 tf tensor
         states = tf.convert_to_tensor(states, dtype=tf.float32)
@@ -176,6 +282,7 @@ class DDPGAgent:
         rewards = tf.convert_to_tensor(rewards, dtype=tf.float32)
         next_states = tf.convert_to_tensor(next_states, dtype=tf.float32)
         dones = tf.convert_to_tensor(dones, dtype=tf.float32)
+        is_weights = tf.convert_to_tensor(is_weights, dtype=tf.float32)
         # 如果多了一层 1（B,1,H,W），挤掉
         if states.shape.rank == 4 and states.shape[1] == 1:
             states = tf.squeeze(states, axis=1)
@@ -183,9 +290,12 @@ class DDPGAgent:
             next_states = tf.squeeze(next_states, axis=1)
 
         # 训练一步
-        actor_loss, actor_grads, critic_loss, critic_grads = self._train_step(
-            states, actions, rewards, next_states, dones
+        actor_loss, actor_grads, critic_loss, critic_grads, td_errors = self._train_step(
+            states, actions, rewards, next_states, dones, is_weights
         )
+
+        # 使用 TD error 更新 PER 中的 priority
+        self.replay.update_priorities(indices, td_errors.numpy())
 
         # 软更新
         self.soft_update(self.target_actor, self.actor)

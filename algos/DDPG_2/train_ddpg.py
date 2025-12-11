@@ -6,7 +6,7 @@ from torch.utils.tensorboard import SummaryWriter
 from matplotlib import pyplot as plt
 import os.path as osp
 
-from algos.DDPG.ddpg_agent import DDPGAgent   # ← 替换为你的DDPGAgent路径
+from ddpg_agent import DDPGAgent   # ← 替换为你的DDPGAgent路径
 from envs.env import Environment
 from parameter.paramAgent import args_agent
 from parameter.paramEnv import args_env
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     args_env.ranges_y = ranges_1[1]
     args_env.n_uav = 9
     args_env.n_jobs = 50
-    args_env.use_potential_reward = False
+    args_env.use_potential_reward = True
 
     if args_env.use_potential_reward:
         log_dir_log = "/Users/tengman/Documents/Python/UAVTrajectory/pythonProject1103/log_data/ddpg/"

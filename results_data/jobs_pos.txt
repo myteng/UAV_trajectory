@@ -1,0 +1,50 @@
+job_id: 0, job_pos: [ 98. 252.   0.], job_lab: 6
+job_id: 1, job_pos: [107. 120.   0.], job_lab: 4
+job_id: 2, job_pos: [130.  36.   0.], job_lab: 1
+job_id: 3, job_pos: [  7. 104.   0.], job_lab: 3
+job_id: 4, job_pos: [162.  77.   0.], job_lab: 1
+job_id: 5, job_pos: [145.  52.   0.], job_lab: 1
+job_id: 6, job_pos: [149. 158.   0.], job_lab: 4
+job_id: 7, job_pos: [199. 119.   0.], job_lab: 4
+job_id: 8, job_pos: [180.  41.   0.], job_lab: 1
+job_id: 9, job_pos: [ 24. 149.   0.], job_lab: 3
+job_id: 10, job_pos: [114. 107.   0.], job_lab: 4
+job_id: 11, job_pos: [178. 180.   0.], job_lab: 4
+job_id: 12, job_pos: [287.  91.   0.], job_lab: 2
+job_id: 13, job_pos: [149.  37.   0.], job_lab: 1
+job_id: 14, job_pos: [266. 100.   0.], job_lab: 2
+job_id: 15, job_pos: [300.  50.   0.], job_lab: 2
+job_id: 16, job_pos: [158.  45.   0.], job_lab: 1
+job_id: 17, job_pos: [5. 5. 0.], job_lab: 0
+job_id: 18, job_pos: [66. 85.  0.], job_lab: 0
+job_id: 19, job_pos: [129.  11.   0.], job_lab: 1
+job_id: 20, job_pos: [164. 139.   0.], job_lab: 4
+job_id: 21, job_pos: [254. 172.   0.], job_lab: 5
+job_id: 22, job_pos: [13. 53.  0.], job_lab: 0
+job_id: 23, job_pos: [199. 119.   0.], job_lab: 4
+job_id: 24, job_pos: [57. 55.  0.], job_lab: 0
+job_id: 25, job_pos: [63. 41.  0.], job_lab: 0
+job_id: 26, job_pos: [45.  9.  0.], job_lab: 0
+job_id: 27, job_pos: [44. 44.  0.], job_lab: 0
+job_id: 28, job_pos: [146.   9.   0.], job_lab: 1
+job_id: 29, job_pos: [126.   0.   0.], job_lab: 1
+job_id: 30, job_pos: [95.  0.  0.], job_lab: 0
+job_id: 31, job_pos: [77. 29.  0.], job_lab: 0
+job_id: 32, job_pos: [258. 114.   0.], job_lab: 5
+job_id: 33, job_pos: [ 16. 103.   0.], job_lab: 3
+job_id: 34, job_pos: [ 42. 260.   0.], job_lab: 6
+job_id: 35, job_pos: [ 70. 281.   0.], job_lab: 6
+job_id: 36, job_pos: [13. 68.  0.], job_lab: 0
+job_id: 37, job_pos: [148.  18.   0.], job_lab: 1
+job_id: 38, job_pos: [240. 165.   0.], job_lab: 5
+job_id: 39, job_pos: [137.  47.   0.], job_lab: 1
+job_id: 40, job_pos: [16. 76.  0.], job_lab: 0
+job_id: 41, job_pos: [89.  9.  0.], job_lab: 0
+job_id: 42, job_pos: [ 70. 153.   0.], job_lab: 3
+job_id: 43, job_pos: [175.  54.   0.], job_lab: 1
+job_id: 44, job_pos: [ 10. 131.   0.], job_lab: 3
+job_id: 45, job_pos: [ 81. 167.   0.], job_lab: 3
+job_id: 46, job_pos: [101. 153.   0.], job_lab: 4
+job_id: 47, job_pos: [ 56. 226.   0.], job_lab: 6
+job_id: 48, job_pos: [111. 123.   0.], job_lab: 4
+job_id: 49, job_pos: [ 14. 171.   0.], job_lab: 3

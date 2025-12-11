@@ -115,7 +115,7 @@ if __name__ == '__main__':
     log_dir_result = "/Users/tengman/Documents/Python/UAVTrajectory/pythonProject1103/results_data/"
 
     log_dir_bp_0 = "/Users/tengman/Documents/Python/UAVTrajectory/pythonProject1103/log_bp_data/"
-    seed_set = [0, 64, 128]
+    seed_set = [0]
 
     ranges_1 = [300, 300]
     ranges_2 = [500, 500]
