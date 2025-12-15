@@ -32,21 +32,22 @@ class asyDDPGAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.update_epochs = 1              # DDPG 每一步更新一次（也可按需多步），默认 1
-        self.learning_rate = 1e-4
+        self.learning_rate = 3e-4           # 提高学习率（从1e-4到3e-4），加快学习速度
         self.gamma = 0.99
         # self.lam = 0.95                      # DDPG 不使用，但保留字段以“参数一致”
-        self.horizon = 28                    # 用作默认的 batch_size
+        self.horizon = 64                    # 增加batch_size（从28到64），提高训练稳定性
         self.hidden_sizes = (64, 64)
 
         # DDPG 相关新增超参
         self.tau = 0.005                     # 软更新系数
-        self.noise_std = 0.1                 # 探索噪声（训练时用）
+        self.noise_std = 0.3                 # 探索噪声（训练时用，从0.1提高到0.3，增强探索）
         self.replay = ReplayBuffer(capacity=int(1e6))  # Off-policy 经验池
-        self.min_replay_for_update = max(1000, 10 * self.horizon)  # 开始训练前需的最小经验量
+        self.min_replay_for_update = max(500, 5 * self.horizon)  # 降低最小经验量（从1000到500），更早开始学习
 
-        # 动作缩放（α∈(0,1)，θ∈[0,2π)）
-        self.scale = tf.constant([0.5] + [math.pi] * (action_dim - 1), dtype=tf.float32)
-        self.shift = tf.constant([0.5] + [math.pi] * (action_dim - 1), dtype=tf.float32)
+        # 动作缩放：将 tanh 输出 (-1,1) 线性映射到 [0, 2π)
+        # 使用更平滑的映射：u ∈ (-1,1) → θ = π * (u + 1) ∈ [0, 2π)
+        self.scale = tf.constant([math.pi] * action_dim, dtype=tf.float32)
+        self.shift = tf.constant([math.pi] * action_dim, dtype=tf.float32)  # 偏移量，用于映射
 
         # ---- 构建网络：Actor / Critic 及其 Target ----
         self.actor = self.build_actor(self.hidden_sizes)
@@ -65,12 +66,16 @@ class asyDDPGAgent:
     # -------- 网络结构（与 PPO 风格保持：Sequential + Flatten）--------
     def build_actor(self, hidden_sizes):
         # 输出为 (-1,1) 的 u，经线性缩放映射到目标动作区间
+        # 使用更好的初始化：最后一层使用小的随机初始化，避免输出集中在边界
         model = tf.keras.Sequential()
         model.add(tf.keras.layers.InputLayer(shape=self.state_dim))
         model.add(tf.keras.layers.Flatten())
         for h in hidden_sizes:
-            model.add(tf.keras.layers.Dense(h, activation='relu'))
-        model.add(tf.keras.layers.Dense(self.action_dim, activation='tanh'))  # u in (-1,1)
+            model.add(tf.keras.layers.Dense(h, activation='relu',
+                                           kernel_initializer=tf.keras.initializers.HeNormal()))
+        # 最后一层使用小的初始化，让输出更分散在(-1,1)范围内
+        model.add(tf.keras.layers.Dense(self.action_dim, activation='tanh',
+                                       kernel_initializer=tf.keras.initializers.RandomUniform(-0.003, 0.003)))
         return model
 
     def build_critic(self, hidden_sizes):
@@ -96,7 +101,8 @@ class asyDDPGAgent:
 
     # -------- 动作相关：缩放映射（将 Actor 输出的 u∈(-1,1) 映射为物理动作区间）--------
     def _squash_and_scale(self, u):
-        # u in (-1,1)  ->  action = scale * (u + 1.0)
+        # u in (-1,1)  ->  action = π * (u + 1.0) ∈ [0, 2π)
+        # 这样映射：u=-1→0, u=0→π, u=1→2π，但更平滑的分布
         return self.scale * (u + 1.0)
 
     def _clip_to_valid(self, action):
@@ -113,9 +119,14 @@ class asyDDPGAgent:
         """
         u = self.actor(state)                                   # (-1,1)
         if add_noise:
-            noise = tf.random.normal(shape=tf.shape(u), stddev=self.noise_std)
-            u = tf.clip_by_value(u + noise, -1.0, 1.0)
+            # 使用更大的探索噪声，并在动作空间（角度空间）添加噪声，而不是在tanh空间
+            noise_tanh = tf.random.normal(shape=tf.shape(u), stddev=self.noise_std)
+            u = tf.clip_by_value(u + noise_tanh, -1.0, 1.0)
         action = self._squash_and_scale(u)
+        # 在角度空间添加额外的小噪声（0.1弧度≈5.7度），增强探索
+        if add_noise:
+            angle_noise = tf.random.normal(shape=tf.shape(action), stddev=0.1)
+            action = action + angle_noise
         action = self._clip_to_valid(action)
         return action.numpy()[0]
 

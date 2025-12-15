@@ -17,6 +17,7 @@ from envs.uav import UAV
 from parameter.paramEnv import args_env
 from utils.common import set_rand_seed
 from utils.normal import Normalize, RewardScaling
+from utils.save_txt import TXT_FILE
 
 """
 固定alpha，环境状态S_t先采用匈牙利算法决策卸载O，然后更新环境状态S'，输入RL算法，
@@ -43,10 +44,14 @@ class Environment_1(object):
             self.n_feature = 9  # 状态特征长度
         else:
             self.n_feature = 7
+        
+        self.save_txt = TXT_FILE()
 
         # Map
         self.map = Map()
         self.grid_load = np.zeros(self.map.n_grids)
+        # 动态任务负载（每步更新，反映剩余任务分布）
+        self.grid_load_dynamic = np.zeros(self.map.n_grids)
 
         # UAVs
         self.n_uav = args_env.n_uav
@@ -87,6 +92,8 @@ class Environment_1(object):
         self.reward_task_num = 0
         self.reward_eer = 0
         self.reward_hotspots = 0
+        self.reward_deadline_margin = 0.0
+        self.reward_coverage = 0.0
 
         self.t_tx = np.zeros(self.n_jobs, dtype=np.float32)
         # self.offload = np.zeros((self.n_jobs, self.n_uav), dtype=np.float32)
@@ -108,6 +115,8 @@ class Environment_1(object):
         self.reward_task_num = 0
         self.reward_eer = 0
         self.reward_hotspots = 0
+        self.reward_deadline_margin = 0.0
+        self.reward_coverage = 0.0
 
         # Reset UAV Property
         for uav_id in range(self.n_uav):
@@ -115,11 +124,14 @@ class Environment_1(object):
         self.get_u2u()
 
         # Reset Jobs Property
+        self.grid_load = np.zeros(self.map.n_grids)  # 重置静态负载
+        self.grid_load_dynamic = np.zeros(self.map.n_grids)  # 重置动态负载
         for job_id in range(self.n_jobs):
             self.jobs[job_id].reset_jobs(job_id)
             grid_id = self.jobs[job_id].lab
-            # Load Distribution
+            # Load Distribution（初始任务分布）
             self.grid_load[grid_id] = self.grid_load[grid_id] + 1
+            self.grid_load_dynamic[grid_id] = self.grid_load_dynamic[grid_id] + 1
 
         # Hotspots
         self.hotspots = compute_hotspots_from_jobs(self.jobs, self.n_hotspots)
@@ -154,6 +166,8 @@ class Environment_1(object):
         self.reward_task_num = 0
         self.reward_eer = 0
         self.reward_hotspots = 0
+        self.reward_deadline_margin = 0.0
+        self.reward_coverage = 0.0
         self.uav_pre_pos = []
 
         # 先计算Reward值，更新UAV状态
@@ -214,8 +228,35 @@ class Environment_1(object):
         # 更新U2U通信
         self.get_u2u()
 
-        # 热点奖励
-        self.reward_hotspots = self.compute_hotspot_reward()
+        # 动态更新热点（未完成任务），让奖励跟随任务分布变化
+        unfinished_jobs = [job for job in self.jobs if not job.finish]
+        # 更新动态任务负载：只统计未完成任务的分布
+        self.grid_load_dynamic = np.zeros(self.map.n_grids)
+        for job in unfinished_jobs:
+            if job.lab is not None:
+                self.grid_load_dynamic[job.lab] += 1
+        
+        if unfinished_jobs:
+            self.hotspots = compute_hotspots_from_jobs(unfinished_jobs, self.n_hotspots)
+            _, self.uav_hotspots = assign_hotspots_to_uav(self.uav, self.hotspots)
+        else:
+            # 如果没有未完成任务，热点设为地图中心（避免除零）
+            self.hotspots = np.array([[args_env.ranges_x / 2, args_env.ranges_y / 2]])
+            _, self.uav_hotspots = assign_hotspots_to_uav(self.uav, self.hotspots)
+
+        # 热点奖励（提高权重，让agent更关注向任务移动）
+        self.reward_hotspots = self.compute_hotspot_reward(w_hot=20.0)  # 从10提高到20
+
+        # 覆盖奖励：鼓励 UAV 分布在任务密集区域
+        self.reward_coverage = 0.0
+        max_load = float(np.max(self.grid_load_dynamic)) if np.any(self.grid_load_dynamic) else 0.0
+        if max_load > 0:
+            coverage_sum = 0.0
+            for u in range(self.n_uav):
+                lab_idx = int(self.uav[u].lab) if self.uav[u].lab is not None else 0
+                lab_idx = np.clip(lab_idx, 0, self.grid_load_dynamic.shape[0] - 1)
+                coverage_sum += self.grid_load_dynamic[lab_idx] / max_load
+            self.reward_coverage = coverage_sum / max(1, self.n_uav)
 
         # 更新Job状态
         for j in range(self.n_jobs):
@@ -267,25 +308,31 @@ class Environment_1(object):
         #   - self.cost_energy：能耗成本
         #   - theta：本时刻各 UAV 的方向角（来自动作），方差越大表示方向越分散
         # self.cost_penalty += self.penalty_trajectory + self.penalty_energy
-        self.cost_penalty += self.penalty_trajectory + self.penalty_energy + self.penalty_task
-        penalty_term = self.cost_penalty / self.n_uav
-        success_term = self.reward_job_success
-        task_term = self.reward_task_num
-        time_term = self.cost_time
-        hotspots_term = self.reward_hotspots
-        reward_term = hotspots_term + 10 * success_term
-        # angle_diversity = float(np.var(theta))
-        # 原始 reward（未缩放），数值可能较大
-        # raw_reward = (
-        #         -1.0 * penalty_term  # 强烈惩罚碰撞/超时/欠传等
-        #         + 1.0 * success_term  # 按时完成任务的正向奖励
-        #         + 0.8 * task_term  # 当前时隙执行的任务数
-        #         + 1.0 * hotspots_term
-        #         - 0.2 * time_term  # 时间越长越差
-        # )
-        # 为了让数值落在一个较稳定的范围内，这里做一个简单缩放
-        # reward_value = float(raw_reward / 10.0)
-        reward_value = hotspots_term - 0.1 * self.penalty_trajectory - self.cost_time / self.n_jobs
+        self.cost_penalty = self.penalty_trajectory + self.penalty_energy + self.penalty_task
+        success_term = self.reward_job_success          # 完成的任务数
+        task_term = self.reward_task_num                # 本步分配的任务数
+        time_term = self.cost_time                      # 本步任务执行的增量时间
+        energy_term = self.cost_energy                  # 本步能耗
+        hotspots_term = self.reward_hotspots            # 向热点靠近的距离改变量
+
+        time_norm = self._normalize_time(time_term)
+        energy_norm = self._normalize_energy(energy_term)
+        hotspot_norm = self._normalize_hotspot(hotspots_term)
+        task_norm = task_term / max(1.0, self.n_jobs)
+        success_norm = (success_term + self.reward_deadline_margin) / max(1.0, self.n_jobs)
+        coverage_norm = self.reward_coverage
+        timeout_norm = self.penalty_task / max(1.0, self.n_jobs)
+
+        reward_value = (
+            args_env.reward_w_hotspot * hotspot_norm
+            + args_env.reward_w_task * task_norm
+            + args_env.reward_w_success * success_norm
+            + args_env.reward_w_coverage * coverage_norm
+            - args_env.reward_w_time * time_norm
+            - args_env.reward_w_energy * energy_norm
+            - args_env.reward_w_collision * self.penalty_trajectory
+            - args_env.reward_w_timeout * timeout_norm
+        )
 
         # reward_set = np.array([-self.cost_time, -self.cost_energy, -self.cost_penalty])
         # # reward_set = self.reward_norm(reward_set)
@@ -326,16 +373,19 @@ class Environment_1(object):
                     self.jobs[j].finish_time[i] = self.t + t_total  # 更新任务的完成时间点
                     self.job_decision_time[j] = self.jobs[j].finish_time[i]   # 更新job下一个可决策的时间点
                     self.uav_free_time[u] = self.jobs[j].finish_time[i]       # 更新UAV的空闲时间点，与job下一个可决策时间点一致
-                    self.cost_time += self.job_decision_time[j]
+                    # 只累加本次任务的增量执行时间，避免使用绝对时间导致 reward 巨大负数
+                    self.cost_time += t_total
                     self.reward_task_num += 1
 
                     # 任务完成奖励值
                     if i == (self.jobs[j].n_task - 1):
                         if self.job_decision_time[j] <= self.jobs[j].deadline:
                             self.reward_job_success += 1
-                            self.penalty_task += -10
+                            margin = (self.jobs[j].deadline - self.job_decision_time[j]) / max(1.0, self.jobs[j].deadline)
+                            self.reward_deadline_margin += max(0.0, margin)
                         else:
-                            self.penalty_task += 10
+                            overdue = (self.job_decision_time[j] - self.jobs[j].deadline) / max(1.0, self.jobs[j].deadline)
+                            self.penalty_task += max(0.0, overdue)
 
                     # 软约束--任务传输时长超过Phase A
                     time_a = self.t_tx[j] - self.alpha * self.slot
@@ -375,6 +425,19 @@ class Environment_1(object):
         # 返回总热点奖励（也可以选择 np.mean(r_u)）
         return float(np.sum(r_u))
 
+    def _normalize_time(self, value):
+        denom = max(1.0, args_env.deadline_max * self.n_jobs)
+        return value / denom
+
+    def _normalize_energy(self, value):
+        denom = max(1.0, args_env.max_energy_uav * self.n_uav)
+        return value / denom
+
+    def _normalize_hotspot(self, value):
+        diag = math.hypot(args_env.ranges_x, args_env.ranges_y)
+        denom = max(1.0, diag * self.n_uav)
+        return value / denom
+
     def get_state(self):
         for uav_id in range(self.n_uav):
             self.uav_feats[uav_id, 0] = self.uav[uav_id].pos[0]
@@ -386,7 +449,18 @@ class Environment_1(object):
             # if self.use_potential_reward:
             #     self.uav_feats[uav_id, 6] = self.uav[uav_id].move_x
             #     self.uav_feats[uav_id, 7] = self.uav[uav_id].move_y
-            self.uav_feats[uav_id, 6] = self.grid_load[uav_id]
+            # 用 UAV 所在网格的动态任务负载（反映剩余任务）
+            lab_idx = int(self.uav[uav_id].lab) if self.uav[uav_id].lab is not None else 0
+            self.uav_feats[uav_id, 6] = self.grid_load_dynamic[lab_idx]
+            
+            # 添加热点方向信息（归一化的相对位置）
+            if self.uav_hotspots is not None and len(self.uav_hotspots) > uav_id:
+                hotspot = self.uav_hotspots[uav_id]
+                # 计算到热点的归一化方向向量（相对于地图范围）
+                dx = (hotspot[0] - self.uav[uav_id].pos[0]) / max(args_env.ranges_x, 1)
+                dy = (hotspot[1] - self.uav[uav_id].pos[1]) / max(args_env.ranges_y, 1)
+                # 如果状态维度允许，可以添加这两个特征
+                # 这里先不添加，避免改变状态维度
             if self.use_potential_reward:
                 self.uav_feats[uav_id, 7] = self.uav[uav_id].move_x
                 self.uav_feats[uav_id, 8] = self.uav[uav_id].move_y
@@ -494,5 +568,3 @@ if __name__ == '__main__':
             print(f"Step = {t}, Reward = {reward}")
 
             state = next_state
-
-

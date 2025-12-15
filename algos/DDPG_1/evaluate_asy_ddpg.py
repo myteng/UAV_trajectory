@@ -4,6 +4,7 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 from matplotlib import pyplot as plt
+from matplot.uav_trajectory_plot import plot_uav_and_jobs
 
 from algos.DDPG_1.asy_ddpg_agent import asyDDPGAgent
 from envs.env_1 import Environment_1
@@ -11,6 +12,7 @@ from parameter.paramAgent import args_agent
 from parameter.paramEnv import args_env
 from utils.common import set_rand_seed
 from utils.normal import Normalize, RewardScaling
+from utils.save_txt import TXT_FILE
 import os.path as osp
 
 
@@ -20,6 +22,8 @@ def evaluate_policy_asy_ddpg(env, agent, times, state_norm):
     r_energy_sum = 0
     r_penalty_sum = 0
     r_task_success_sum = 0
+    save_txt = TXT_FILE()
+    save_txt.clear_pos()
 
     for t in range(times):
         episode_reward = []
@@ -30,12 +34,15 @@ def evaluate_policy_asy_ddpg(env, agent, times, state_norm):
 
         state, reward, r_time, r_energy, r_penalty = env.reset()
 
+        save_txt.save_job_position(env.jobs, env.n_jobs)
+
         episode_reward.append(reward)
         episode_r_time.append(r_time)
         episode_r_energy.append(r_energy)
         episode_r_penalty.append(r_penalty)
 
         for step in range(1000):
+            save_txt.save_uav_position(t, step, env.uav, env.n_uav)
             # 归一化当前状态
             state = state.astype(np.float32)[None, ...]
             if args_agent.use_state_normal:
@@ -156,3 +163,5 @@ if __name__ == '__main__':
             rewards_ddpg_1_no_energy.append(rewards_energy_ddpg_1_no)
             rewards_ddpg_1_no_penalty.append(rewards_penalty_ddpg_1_no)
             print(f"DDPG_1_no_potential: Reward = {reward_avg_evaluate_ddpg_1_no}, Time = {rewards_time_ddpg_1_no}, Energy = {rewards_energy_ddpg_1_no}, penalty = {rewards_penalty_ddpg_1_no}, task_success = {rewards_task_success_ddpg_1_no} ")
+
+        plot_uav_and_jobs(uav_file="results_data/uav_pos.txt", job_file="results_data/jobs_pos.txt", save_path="results_data/uav_jobs_plot_1.png")

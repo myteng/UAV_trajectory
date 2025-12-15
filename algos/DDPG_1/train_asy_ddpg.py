@@ -67,6 +67,11 @@ def training_asy_ddpg(epochs, log_dir_log, log_dir_bp):
             # 写入经验池并训练一步
             agent.remember(s, action, reward, s_next, float(is_terminal))
             a_loss, _, c_loss, _ = agent.update()
+            
+            # 每100步打印一次训练信息，帮助诊断
+            if step % 100 == 0 and a_loss is not None:
+                print(f"[Training] Step {step}, Actor Loss: {a_loss:.4f}, Critic Loss: {c_loss:.4f}, "
+                      f"Replay Buffer Size: {len(agent.replay)}")
 
             reward_sum.append(reward)
 

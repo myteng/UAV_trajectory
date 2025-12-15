@@ -4,26 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b3f48ec2-dc91-491c-8913-15fec65aa2e6" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/algos/DDPG/ddpg_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG/ddpg_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/algos/DDPG/evaluate_ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG/evaluate_ddpg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/algos/DDPG/train_ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG/train_ddpg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/algos/DDPG_1/evaluate_asy_ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG_1/evaluate_asy_ddpg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/envs/env.py" beforeDir="false" afterPath="$PROJECT_DIR$/envs/env.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/envs/env_1.py" beforeDir="false" afterPath="$PROJECT_DIR$/envs/env_1.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential/checkpoint_epoch199.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential/checkpoint_epoch199.pt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential/checkpoint_epoch399.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential/checkpoint_epoch399.pt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential/checkpoint_epoch599.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential/checkpoint_epoch599.pt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential/checkpoint_epoch799.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential/checkpoint_epoch799.pt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch199.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch199.pt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch399.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch399.pt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch599.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch599.pt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch799.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch799.pt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/log_data/ddpg_no_potential_1/20251208-095314-DDPG/events.out.tfevents.1765158794.TengmandeMacBook-Pro.local.10232.0" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/results_fig/train_ddpg_results/DDPG_Reward.png" beforeDir="false" afterPath="$PROJECT_DIR$/results_fig/train_ddpg_results/DDPG_Reward.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/save_txt.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/save_txt.py" afterDir="false" />
-    </list>
+    <list default="true" id="b3f48ec2-dc91-491c-8913-15fec65aa2e6" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
