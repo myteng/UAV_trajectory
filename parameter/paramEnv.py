@@ -159,22 +159,4 @@ parser.add_argument('--datasets', type=bool, default=False,
 parser.add_argument('--p_tx_gts', type=int, default=5,
                     help='The transmission power of GTs (default: 5dbm)')
 
-# - Reward weights -
-parser.add_argument('--reward_w_hotspot', type=float, default=1.5,
-                    help='Weight for hotspot distance improvement term')
-parser.add_argument('--reward_w_task', type=float, default=2.0,
-                    help='Weight for per-task allocation reward')
-parser.add_argument('--reward_w_success', type=float, default=3.0,
-                    help='Weight for on-time job completion reward')
-parser.add_argument('--reward_w_coverage', type=float, default=1.0,
-                    help='Weight for coverage/diversity reward')
-parser.add_argument('--reward_w_time', type=float, default=1.0,
-                    help='Weight for normalized time cost penalty')
-parser.add_argument('--reward_w_energy', type=float, default=1.0,
-                    help='Weight for normalized energy cost penalty')
-parser.add_argument('--reward_w_collision', type=float, default=5.0,
-                    help='Weight for collision/trajectory penalty')
-parser.add_argument('--reward_w_timeout', type=float, default=2.0,
-                    help='Weight for deadline violation penalty')
-
 args_env = parser.parse_args()

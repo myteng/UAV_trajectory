@@ -92,8 +92,6 @@ class Environment_1(object):
         self.reward_task_num = 0
         self.reward_eer = 0
         self.reward_hotspots = 0
-        self.reward_deadline_margin = 0.0
-        self.reward_coverage = 0.0
 
         self.t_tx = np.zeros(self.n_jobs, dtype=np.float32)
         # self.offload = np.zeros((self.n_jobs, self.n_uav), dtype=np.float32)
@@ -115,8 +113,6 @@ class Environment_1(object):
         self.reward_task_num = 0
         self.reward_eer = 0
         self.reward_hotspots = 0
-        self.reward_deadline_margin = 0.0
-        self.reward_coverage = 0.0
 
         # Reset UAV Property
         for uav_id in range(self.n_uav):
@@ -166,8 +162,6 @@ class Environment_1(object):
         self.reward_task_num = 0
         self.reward_eer = 0
         self.reward_hotspots = 0
-        self.reward_deadline_margin = 0.0
-        self.reward_coverage = 0.0
         self.uav_pre_pos = []
 
         # 先计算Reward值，更新UAV状态
@@ -247,17 +241,6 @@ class Environment_1(object):
         # 热点奖励（提高权重，让agent更关注向任务移动）
         self.reward_hotspots = self.compute_hotspot_reward(w_hot=20.0)  # 从10提高到20
 
-        # 覆盖奖励：鼓励 UAV 分布在任务密集区域
-        self.reward_coverage = 0.0
-        max_load = float(np.max(self.grid_load_dynamic)) if np.any(self.grid_load_dynamic) else 0.0
-        if max_load > 0:
-            coverage_sum = 0.0
-            for u in range(self.n_uav):
-                lab_idx = int(self.uav[u].lab) if self.uav[u].lab is not None else 0
-                lab_idx = np.clip(lab_idx, 0, self.grid_load_dynamic.shape[0] - 1)
-                coverage_sum += self.grid_load_dynamic[lab_idx] / max_load
-            self.reward_coverage = coverage_sum / max(1, self.n_uav)
-
         # 更新Job状态
         for j in range(self.n_jobs):
             # 当前时刻job的task还未执行完
@@ -308,30 +291,22 @@ class Environment_1(object):
         #   - self.cost_energy：能耗成本
         #   - theta：本时刻各 UAV 的方向角（来自动作），方差越大表示方向越分散
         # self.cost_penalty += self.penalty_trajectory + self.penalty_energy
-        self.cost_penalty = self.penalty_trajectory + self.penalty_energy + self.penalty_task
+        self.cost_penalty += self.penalty_trajectory + self.penalty_energy + self.penalty_task
         success_term = self.reward_job_success          # 完成的任务数
         task_term = self.reward_task_num                # 本步分配的任务数
         time_term = self.cost_time                      # 本步任务执行的增量时间
         energy_term = self.cost_energy                  # 本步能耗
         hotspots_term = self.reward_hotspots            # 向热点靠近的距离改变量
 
-        time_norm = self._normalize_time(time_term)
-        energy_norm = self._normalize_energy(energy_term)
-        hotspot_norm = self._normalize_hotspot(hotspots_term)
-        task_norm = task_term / max(1.0, self.n_jobs)
-        success_norm = (success_term + self.reward_deadline_margin) / max(1.0, self.n_jobs)
-        coverage_norm = self.reward_coverage
-        timeout_norm = self.penalty_task / max(1.0, self.n_jobs)
-
+        # 稳定且有导向性的奖励：靠近热点、完成/分配任务，惩罚越界、耗时、能耗
+        # 提高热点奖励权重，降低时间惩罚，让agent优先向任务密集区移动
         reward_value = (
-            args_env.reward_w_hotspot * hotspot_norm
-            + args_env.reward_w_task * task_norm
-            + args_env.reward_w_success * success_norm
-            + args_env.reward_w_coverage * coverage_norm
-            - args_env.reward_w_time * time_norm
-            - args_env.reward_w_energy * energy_norm
-            - args_env.reward_w_collision * self.penalty_trajectory
-            - args_env.reward_w_timeout * timeout_norm
+            2.0 * hotspots_term                          # 提高热点奖励权重（从0.5到2.0）
+            + 5.0 * success_term                         # 完成任务奖励
+            + 2.0 * task_term                           # 分配任务奖励
+            - 1.0 * self.penalty_trajectory             # 越界惩罚（保持）
+            - 0.001 * time_term                         # 大幅降低时间惩罚（从0.01到0.001）
+            - 0.0001 * energy_term                      # 进一步降低能耗惩罚
         )
 
         # reward_set = np.array([-self.cost_time, -self.cost_energy, -self.cost_penalty])
@@ -381,11 +356,9 @@ class Environment_1(object):
                     if i == (self.jobs[j].n_task - 1):
                         if self.job_decision_time[j] <= self.jobs[j].deadline:
                             self.reward_job_success += 1
-                            margin = (self.jobs[j].deadline - self.job_decision_time[j]) / max(1.0, self.jobs[j].deadline)
-                            self.reward_deadline_margin += max(0.0, margin)
+                            self.penalty_task += -10
                         else:
-                            overdue = (self.job_decision_time[j] - self.jobs[j].deadline) / max(1.0, self.jobs[j].deadline)
-                            self.penalty_task += max(0.0, overdue)
+                            self.penalty_task += 10
 
                     # 软约束--任务传输时长超过Phase A
                     time_a = self.t_tx[j] - self.alpha * self.slot
@@ -424,19 +397,6 @@ class Environment_1(object):
 
         # 返回总热点奖励（也可以选择 np.mean(r_u)）
         return float(np.sum(r_u))
-
-    def _normalize_time(self, value):
-        denom = max(1.0, args_env.deadline_max * self.n_jobs)
-        return value / denom
-
-    def _normalize_energy(self, value):
-        denom = max(1.0, args_env.max_energy_uav * self.n_uav)
-        return value / denom
-
-    def _normalize_hotspot(self, value):
-        diag = math.hypot(args_env.ranges_x, args_env.ranges_y)
-        denom = max(1.0, diag * self.n_uav)
-        return value / denom
 
     def get_state(self):
         for uav_id in range(self.n_uav):
@@ -568,3 +528,5 @@ if __name__ == '__main__':
             print(f"Step = {t}, Reward = {reward}")
 
             state = next_state
+
+
