@@ -1,0 +1,4 @@
+$env:PYTHONPATH = "D:\PhD_Project\UAV_simulation\UAV_trajectory-main"
+D:/Python/Python310/python.exe algos/DDPG/train_ddpg.py
+
+d:\PhD_Project\UAV_simulation\UAV_trajectory-main>tensorboard --logdir=log_data/ddpg
