@@ -42,6 +42,9 @@ class Environment(object):
         self.map = Map()
         self.grid_load = np.zeros(self.map.n_grids)
 
+        # 障碍物地图，用于碰撞检测（墙/建筑等）
+        self.obstacle_map = ObstacleMap()
+
         # UAVs
         self.n_uav = args_env.n_uav
         self.uav = [UAV(uav_id) for uav_id in range(self.n_uav)]
@@ -65,6 +68,10 @@ class Environment(object):
 
         # Cost Matrix
         self.cost = np.zeros((self.n_jobs, self.n_uav), dtype=np.float32)
+
+        # 约束相关惩罚系数（可按需调整）
+        self.collision_penalty = 100.0   # UAV 发生碰撞（越界或撞障碍）时的惩罚
+        self.timeout_penalty = 20.0      # 任务首次超时的惩罚
 
         # State
         self.state = np.zeros((self.n_uav, self.n_feature),dtype=np.float32)
@@ -276,11 +283,32 @@ class Environment(object):
         self.t += 1
         # 更新UAV状态
         for u in range(self.n_uav):
-            # UAV 位置
-            pos_x = self.uav[u].pos[0] + self.uav[u].vels * (1 - alpha) * self.slot * np.cos(theta[u])
-            pos_y = self.uav[u].pos[1] + self.uav[u].vels * (1 - alpha) * self.slot * np.sin(theta[u])
-            pos_z = self.uav[u].pos[2]
-            self.uav[u].pos = np.array([pos_x, pos_y, pos_z])
+            # UAV 位置（先计算候选新位置）
+            prev_pos = self.uav[u].pos.copy()
+            pos_x = prev_pos[0] + self.uav[u].vels * (1 - alpha) * self.slot * np.cos(theta[u])
+            pos_y = prev_pos[1] + self.uav[u].vels * (1 - alpha) * self.slot * np.sin(theta[u])
+            pos_z = prev_pos[2]
+
+            # 边界碰撞检测：是否飞出地图范围
+            out_of_bounds = (
+                pos_x < 0 or pos_x > args_env.ranges_x or
+                pos_y < 0 or pos_y > args_env.ranges_y
+            )
+
+            # 障碍物碰撞检测：飞行路径是否被任意障碍阻挡
+            hit_obstacle = self.obstacle_map.is_path_blocked_3d(
+                tuple(prev_pos), (pos_x, pos_y, pos_z)
+            )
+
+            if out_of_bounds or hit_obstacle:
+                # 碰撞：增加惩罚，并将位置保持在上一步（不穿过障碍/边界）
+                self.cost_penalty += self.collision_penalty
+                # 也可以选择裁剪到边界，这里保持上一位置更安全
+                self.uav[u].pos = prev_pos
+                pos_x, pos_y, pos_z = prev_pos[0], prev_pos[1], prev_pos[2]
+            else:
+                # 正常更新位置
+                self.uav[u].pos = np.array([pos_x, pos_y, pos_z])
             # UAV label
             x_lab = math.ceil(pos_x / args_env.range_pos) - 1
             y_lab = math.ceil(pos_y / args_env.range_pos) - 1
@@ -328,15 +356,38 @@ class Environment(object):
             else:
                 # 更新deadline（无论是否被执行，deadline都要减1）
                 self.jobs[j].deadline -= self.slot
+                # 任务超时惩罚：仅在首次超时越界时施加一次固定惩罚
                 if self.jobs[j].deadline < 0:
-                    self.cost_penalty += np.abs(self.jobs[j].deadline)
+                    # 使用动态属性标记是否已经对该 job 施加超时惩罚
+                    if not hasattr(self.jobs[j], 'timeout_flag') or not self.jobs[j].timeout_flag:
+                        self.cost_penalty += self.timeout_penalty
+                        self.jobs[j].timeout_flag = True
 
-        # 归一化，求Reward值
-        # reward_set = np.array([-self.cost_time, -self.cost_energy, -self.cost_penalty])
-        # reward_set = self.reward_norm(reward_set)
-        # reward_set = np.array(reward_set)
-        # reward_value = round(np.sum(reward_set * self.reward_weight), 2)
-        reward_value = -self.cost_time - self.cost_penalty
+        # 手工加权 Reward：碰撞/超时惩罚 > 按时完成任务 > 能耗/时间 + 少量角度多样性奖励
+        # 说明：
+        #   - self.cost_penalty：包含碰撞、超时、欠传等惩罚（越大越差）
+        #   - self.reward_task_success：按时完成任务数量（越大越好）
+        #   - self.cost_time：执行时间成本
+        #   - self.cost_energy：能耗成本
+        #   - theta：本时刻各 UAV 的方向角（来自动作），方差越大表示方向越分散
+        penalty_term = self.cost_penalty
+        success_term = self.reward_task_success
+        time_term = self.cost_time
+        energy_term = self.cost_energy
+        angle_diversity = float(np.var(theta))
+
+        # 原始 reward（未缩放），数值可能较大
+        raw_reward = (
+            -1.0 * penalty_term        # 强烈惩罚碰撞/超时/欠传等
+            + 0.5 * success_term       # 按时完成任务的正向奖励
+            - 0.3 * time_term          # 时间越长越差
+            - 0.1 * energy_term        # 能耗次要，但也希望越小越好
+            + 0.1 * angle_diversity    # 适度鼓励各 UAV 方向角不要完全一致
+        )
+
+        # 为了让数值落在一个较稳定的范围内，这里做一个简单缩放
+        reward_value = float(raw_reward / 50.0)
+        reward_value = float(raw_reward / 20.0)
 
         return self.get_state(), reward_value, -self.cost_time, -self.cost_energy, -self.cost_penalty, self.reward_task_success
 
