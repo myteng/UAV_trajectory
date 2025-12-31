@@ -29,6 +29,7 @@ class Environment_1(object):
         # Slot
         self.slot = 4   # 时隙长度
         self.t = 0  # 当前时隙t
+        self.slot_count = 0
         self.alpha_ref = 0.5  # 计算潜在奖励值
         self.alpha = 0.5
         self.eta = 0.5  # 前瞻项奖励值系数
@@ -53,6 +54,9 @@ class Environment_1(object):
         # 动态任务负载（每步更新，反映剩余任务分布）
         self.grid_load_dynamic = np.zeros(self.map.n_grids)
 
+        # 障碍物地图，用于碰撞检测（墙/建筑等）
+        self.obstacle_map = ObstacleMap()
+
         # UAVs
         self.n_uav = args_env.n_uav
         self.uav = [UAV(uav_id) for uav_id in range(self.n_uav)]
@@ -75,23 +79,21 @@ class Environment_1(object):
         self.H = np.zeros((self.n_jobs, self.n_uav), dtype=np.float32)
 
         # Hotspots
-        self.n_hotspots = 1
+        self.n_hotspots = 4
         self.hotspots = [None for h in range(self.n_hotspots)]
         self.uav_hotspots = [None for u in range(self.n_uav)]
         self.uav_pre_pos = []
 
+        # 约束相关惩罚系数（可按需调整）
+        self.collision_penalty = 100.0  # UAV 发生碰撞（越界或撞障碍）时的惩罚
+        self.timeout_penalty = 20.0  # 任务首次超时的惩罚
+
         # Cost Matrix
         self.cost = np.zeros((self.n_jobs, self.n_uav), dtype=np.float32)
-        self.cost_time = 0  # 当前时刻的时间成本
-        self.cost_energy = 0  # 当前时刻的能耗成本
+        self.cost_energy = 0
+        self.cost_time = 0
         self.cost_penalty = 0
-        self.penalty_trajectory = 0
-        self.penalty_energy = 0
-        self.penalty_task = 0
         self.reward_job_success = 0
-        self.reward_task_num = 0
-        self.reward_eer = 0
-        self.reward_hotspots = 0
 
         self.t_tx = np.zeros(self.n_jobs, dtype=np.float32)
         # self.offload = np.zeros((self.n_jobs, self.n_uav), dtype=np.float32)
@@ -103,16 +105,10 @@ class Environment_1(object):
 
     def reset(self):
         self.t = 0
-        self.cost_time = 0  # 当前时刻的时间成本
-        self.cost_energy = 0  # 当前时刻的能耗成本
+        self.cost_energy = 0
+        self.cost_time = 0
         self.cost_penalty = 0
-        self.penalty_trajectory = 0
-        self.penalty_energy = 0
-        self.penalty_task = 0
         self.reward_job_success = 0
-        self.reward_task_num = 0
-        self.reward_eer = 0
-        self.reward_hotspots = 0
 
         # Reset UAV Property
         for uav_id in range(self.n_uav):
@@ -130,9 +126,10 @@ class Environment_1(object):
             self.grid_load_dynamic[grid_id] = self.grid_load_dynamic[grid_id] + 1
 
         # Hotspots
-        self.hotspots = compute_hotspots_from_jobs(self.jobs, self.n_hotspots)
-        assigned_idx, self.uav_hotspots = assign_hotspots_to_uav(self.uav, self.hotspots)
-
+        # self.hotspots = compute_hotspots_from_jobs(self.jobs, self.n_hotspots)
+        # assigned_idx, self.uav_hotspots = assign_hotspots_to_uav(self.uav, self.hotspots)
+        self.hotspots = np.array([0, 1, 3, 4])
+        
         if any(job.status for job in self.jobs):
             # 匈牙利算法卸载，先计算成本矩阵
             cost_matrix = self.get_cost()
@@ -140,74 +137,82 @@ class Environment_1(object):
             state = self.update_state_hungarian(offload)
         else:
             state = self.get_state()
-        # 计算Reward：
-        # 归一化，求Reward值
-        reward_set = np.array([-self.cost_time, -self.cost_energy, -self.cost_penalty])
-        reward_set = self.reward_norm(reward_set)
-        reward_value = round(np.sum(reward_set * self.reward_weight), 2)
-        return state, reward_value, -self.cost_time, -self.cost_energy, -self.cost_penalty
+
+        return state
 
     def step_asy(self, action):
         self.alpha = 0.5  # 时隙比例
         theta = action  # UAV轨迹
         self.t += self.slot
+        self.slot_count = 1
 
-        self.cost_time = 0  # 当前时刻的时间成本
-        self.cost_energy = 0  # 当前时刻的能耗成本
+        self.cost_energy = 0
+        self.cost_time = 0
         self.cost_penalty = 0
-        self.penalty_trajectory = 0
-        self.penalty_energy = 0
-        self.penalty_task = 0
         self.reward_job_success = 0
-        self.reward_task_num = 0
-        self.reward_eer = 0
-        self.reward_hotspots = 0
+
         self.uav_pre_pos = []
+
+        K = min(5, len(self.grid_load_dynamic))
+        top_ids = np.argsort(-self.grid_load_dynamic)[:K]
+        top_ids = [int(i) for i in top_ids if self.grid_load_dynamic[i] > 0]
 
         # 先计算Reward值，更新UAV状态
         for u in range(self.n_uav):
-            # 更新 UAV 剩余能耗
-            # 悬停能耗
-            e_hov = self.uav[u].hov_energy_coef * self.alpha * self.slot
-            # 飞行能耗
-            p_fly = self.uav[u].fly_energy_coef * 0.5 * (self.uav[u].vels ** 3)
-            direction_factor = 1.0 + 0.5 * (1.0 - math.cos(theta[u]))
-            e_fly = p_fly * direction_factor * (1 - self.alpha) * self.slot
-            # 计算转向能耗
-            d_theta = theta[u] - self.prev_theta[u]
-            d_theta = (d_theta + math.pi) % (2 * math.pi) - math.pi
-            e_turn = self.uav[u].turn_energy_coef * (1 - math.cos(d_theta))
-            # e_turn = 0
-            e_total = e_fly + e_hov + e_turn
-            self.cost_energy += e_total
-            self.uav[u].current_energy -= e_total
-
-            # 更新 UAV 位置
-            prev_pos = self.uav[u].pos.copy()
-            self.uav_pre_pos.append(prev_pos)
-            pos_x = self.uav[u].pos[0] + self.uav[u].vels * (1 - self.alpha) * self.slot * np.cos(theta[u])
-            pos_y = self.uav[u].pos[1] + self.uav[u].vels * (1 - self.alpha) * self.slot * np.sin(theta[u])
-            pos_z = self.uav[u].pos[2]
-            # 边界碰撞检测：是否飞出地图范围
-            out_of_bounds = (
-                    pos_x < 0 or pos_x > args_env.ranges_x or
-                    pos_y < 0 or pos_y > args_env.ranges_y
-            )
-            if out_of_bounds:
-                # 碰撞：增加惩罚，并将位置保持在上一步（不穿过障碍/边界）
-                self.penalty_trajectory = 100
-                # 也可以选择裁剪到边界，这里保持上一位置更安全
-                self.uav[u].pos = prev_pos
-                pos_x, pos_y, pos_z = prev_pos[0], prev_pos[1], prev_pos[2]
+            # 判断UAV是否移动
+            if self.uav[u].current_energy < 0.2 * self.uav[u].max_energy and self.uav[u].id in top_ids:
+                e_total = 0
+                self.cost_energy += e_total
+                self.uav[u].current_energy -= e_total
             else:
-                # 正常更新位置
-                self.uav[u].pos = np.array([pos_x, pos_y, pos_z])
+                # 悬停能耗
+                e_hov = self.uav[u].hov_energy_coef * self.alpha * self.slot
+                # 飞行能耗
+                p_fly = self.uav[u].fly_energy_coef * 0.5 * (self.uav[u].vels ** 3)
+                direction_factor = 1.0 + 0.5 * (1.0 - math.cos(theta[u]))
+                e_fly = p_fly * direction_factor * (1 - self.alpha) * self.slot
+                # 计算转向能耗
+                d_theta = theta[u] - self.prev_theta[u]
+                d_theta = (d_theta + math.pi) % (2 * math.pi) - math.pi
+                e_turn = self.uav[u].turn_energy_coef * (1 - math.cos(d_theta))
+                # e_turn = 0
+                e_total = e_fly + e_hov + e_turn
+                self.cost_energy += e_total
+                self.uav[u].current_energy -= e_total
 
-            # UAV label
-            x_lab = math.ceil(pos_x / args_env.range_pos) - 1
-            y_lab = math.ceil(pos_y / args_env.range_pos) - 1
-            n_grids = args_env.ranges_x / args_env.range_pos
-            self.uav[u].lab = x_lab + y_lab * n_grids
+                # 更新 UAV 位置
+                prev_pos = self.uav[u].pos.copy()
+                self.uav_pre_pos.append(prev_pos)
+                pos_x = self.uav[u].pos[0] + self.uav[u].vels * (1 - self.alpha) * self.slot * np.cos(theta[u])
+                pos_y = self.uav[u].pos[1] + self.uav[u].vels * (1 - self.alpha) * self.slot * np.sin(theta[u])
+                pos_z = self.uav[u].pos[2]
+
+                # 边界碰撞检测：是否飞出地图范围
+                out_of_bounds = (
+                        pos_x < 0 or pos_x > args_env.ranges_x or
+                        pos_y < 0 or pos_y > args_env.ranges_y
+                )
+
+                # 障碍物碰撞检测：飞行路径是否被任意障碍阻挡
+                hit_obstacle = self.obstacle_map.is_path_blocked_3d(
+                    tuple(prev_pos), (pos_x, pos_y, pos_z)
+                )
+
+                if out_of_bounds or hit_obstacle:
+                    # 碰撞：增加惩罚，并将位置保持在上一步（不穿过障碍/边界）
+                    self.cost_penalty += self.collision_penalty
+                    # 也可以选择裁剪到边界，这里保持上一位置更安全
+                    self.uav[u].pos = prev_pos
+                    pos_x, pos_y, pos_z = prev_pos[0], prev_pos[1], prev_pos[2]
+                else:
+                    # 正常更新位置
+                    self.uav[u].pos = np.array([pos_x, pos_y, pos_z])
+
+                # UAV label
+                x_lab = math.ceil(pos_x / args_env.range_pos) - 1
+                y_lab = math.ceil(pos_y / args_env.range_pos) - 1
+                n_grids = args_env.ranges_x / args_env.range_pos
+                self.uav[u].lab = x_lab + y_lab * n_grids
 
             # 更新 UAV 空闲状态
             if self.uav_free_time[u] > self.t:
@@ -229,17 +234,18 @@ class Environment_1(object):
         for job in unfinished_jobs:
             if job.lab is not None:
                 self.grid_load_dynamic[job.lab] += 1
-        
-        if unfinished_jobs:
-            self.hotspots = compute_hotspots_from_jobs(unfinished_jobs, self.n_hotspots)
-            _, self.uav_hotspots = assign_hotspots_to_uav(self.uav, self.hotspots)
-        else:
-            # 如果没有未完成任务，热点设为地图中心（避免除零）
-            self.hotspots = np.array([[args_env.ranges_x / 2, args_env.ranges_y / 2]])
-            _, self.uav_hotspots = assign_hotspots_to_uav(self.uav, self.hotspots)
 
-        # 热点奖励（提高权重，让agent更关注向任务移动）
-        self.reward_hotspots = self.compute_hotspot_reward(w_hot=20.0)  # 从10提高到20
+        # # 计算热点位置
+        # if unfinished_jobs:
+        #     self.hotspots = compute_hotspots_from_jobs(unfinished_jobs, self.n_hotspots)
+        #     _, self.uav_hotspots = assign_hotspots_to_uav(self.uav, self.hotspots)
+        # else:
+        #     # 如果没有未完成任务，热点设为地图中心（避免除零）
+        #     self.hotspots = np.array([[args_env.ranges_x / 2, args_env.ranges_y / 2]])
+        #     _, self.uav_hotspots = assign_hotspots_to_uav(self.uav, self.hotspots)
+        #
+        # # 热点奖励（提高权重，让agent更关注向任务移动）
+        # self.reward_hotspots = self.compute_hotspot_reward(w_hot=20.0)  # 从10提高到20
 
         # 更新Job状态
         for j in range(self.n_jobs):
@@ -267,6 +273,12 @@ class Environment_1(object):
             offload, cost_value = assign_task_with_submatrix(cost_matrix)
             next_state = self.update_state_hungarian(offload)
 
+        # 判断下一个时隙UAV是否都是忙状态
+        all_uav_busy = all(not uav.free for uav in self.uav)
+        while all_uav_busy:
+            next_state = self._advance_one_slot_without_movement()
+            all_uav_busy = all(not uav.free for uav in self.uav)
+
         # 下一个时隙t+1的潜在奖励值 potential_next_cost_value
         is_all_status_false = not any(job.status for job in self.jobs)
         is_all_finished = all(job.curr_task_id == job.n_task - 1 for job in self.jobs)
@@ -274,47 +286,97 @@ class Environment_1(object):
             isterminal = True
         else:
             isterminal = False
-
-        # 计算Reward：
-        # # 归一化，求Reward值
-        # self.reward_eer = 10 * (self.reward_job_success + self.reward_task_num) / self.cost_energy
-        # self.penalty_energy = self.penalty_energy / (self.n_uav * 10)
-        # self.penalty_task = self.penalty_task / self.n_jobs
-        # self.cost_penalty = self.penalty_trajectory + self.penalty_energy + self.penalty_task
-        # reward_value = 0.5 * self.reward_eer - 0.5 * self.cost_penalty
+        # 所有UAV能耗都耗完
+        is_all_uav_energy_empty = all(uav.current_energy <= 1e-6 for uav in self.uav)
+        if is_all_uav_energy_empty:
+            isterminal = True
 
         # 手工加权 Reward：碰撞/超时惩罚 > 按时完成任务 > 能耗/时间 + 少量角度多样性奖励
-        # 说明：
-        #   - self.cost_penalty：包含碰撞、超时、欠传等惩罚（越大越差）
-        #   - self.reward_task_success：按时完成任务数量（越大越好）
-        #   - self.cost_time：执行时间成本
-        #   - self.cost_energy：能耗成本
-        #   - theta：本时刻各 UAV 的方向角（来自动作），方差越大表示方向越分散
-        # self.cost_penalty += self.penalty_trajectory + self.penalty_energy
-        self.cost_penalty += self.penalty_trajectory + self.penalty_energy + self.penalty_task
+        penalty_term = self.cost_penalty
         success_term = self.reward_job_success          # 完成的任务数
-        task_term = self.reward_task_num                # 本步分配的任务数
-        time_term = self.cost_time                      # 本步任务执行的增量时间
-        energy_term = self.cost_energy                  # 本步能耗
-        hotspots_term = self.reward_hotspots            # 向热点靠近的距离改变量
+        time_term = self.cost_time                      # 任务执行的增量时间
+        energy_term = self.cost_energy                  # 能耗
+        angle_diversity = float(np.var(theta))
 
-        # 稳定且有导向性的奖励：靠近热点、完成/分配任务，惩罚越界、耗时、能耗
-        # 提高热点奖励权重，降低时间惩罚，让agent优先向任务密集区移动
-        reward_value = (
-            2.0 * hotspots_term                          # 提高热点奖励权重（从0.5到2.0）
-            + 5.0 * success_term                         # 完成任务奖励
-            + 2.0 * task_term                           # 分配任务奖励
-            - 1.0 * self.penalty_trajectory             # 越界惩罚（保持）
-            - 0.001 * time_term                         # 大幅降低时间惩罚（从0.01到0.001）
-            - 0.0001 * energy_term                      # 进一步降低能耗惩罚
+        # 原始 reward（未缩放），数值可能较大
+        raw_reward = (
+                -1.0 * penalty_term  # 强烈惩罚碰撞/超时/欠传等
+                + 0.5 * success_term  # 按时完成任务的正向奖励
+                - 0.3 * time_term  # 时间越长越差
+                - 0.1 * energy_term  # 能耗次要，但也希望越小越好
+                + 0.1 * angle_diversity  # 适度鼓励各 UAV 方向角不要完全一致
         )
+        raw_reward = raw_reward / self.slot_count
 
-        # reward_set = np.array([-self.cost_time, -self.cost_energy, -self.cost_penalty])
-        # # reward_set = self.reward_norm(reward_set)
-        # reward_set = np.array(reward_set)
-        # reward_value = round(np.sum(reward_set * self.reward_weight), 2)
+        # 为了让数值落在一个较稳定的范围内，这里做一个简单缩放
+        reward_value = float(raw_reward / 20.0)
 
         return reward_value, -self.cost_time, -self.cost_energy, -self.cost_penalty, self.reward_job_success, next_state, isterminal
+
+    def _advance_one_slot_without_movement(self):
+        """
+        推进一个 slot：
+        - UAV 位置不变
+        - 只计算悬停能耗
+        - 推进任务执行 / 通信 / free_time
+        """
+        self.t += self.slot
+        self.slot_count += 1
+        for u in range(self.n_uav):
+            # 悬停能耗
+            e_hov = self.uav[u].hov_energy_coef * self.alpha * self.slot
+            self.uav[u].current_energy -= e_hov
+            self.cost_energy += e_hov
+
+            # 更新 UAV 空闲状态
+            if self.uav_free_time[u] > self.t:
+                self.uav[u].free = False
+            else:
+                self.uav[u].free = True
+
+        # 动态更新热点（未完成任务），让奖励跟随任务分布变化
+        unfinished_jobs = [job for job in self.jobs if not job.finish]
+        # 更新动态任务负载：只统计未完成任务的分布
+        self.grid_load_dynamic = np.zeros(self.map.n_grids)
+        for job in unfinished_jobs:
+            if job.lab is not None:
+                self.grid_load_dynamic[job.lab] += 1
+
+        # 更新Job状态
+        for j in range(self.n_jobs):
+            # 当前时刻job的task还未执行完
+            if self.job_decision_time[j] > self.t:
+                self.jobs[j].status = False
+            # 当前时刻job的task已执行完，准备决策下一个task
+            elif self.job_decision_time[j] == self.t:
+                i = self.jobs[j].curr_task_id
+                if i < (self.jobs[j].n_task - 1):
+                    self.jobs[j].status = True  # 更新job执行状态
+                    self.jobs[j].curr_task_id = i + 1  # 更新job当前准备决策的任务
+                    self.jobs[j].start_time[i + 1] = self.t  # 更新job当前决策任务的开始时间点
+                    self.jobs[j].uav_request[i + 1] = self.jobs[j].uav_offload[i]  # 更新job当前决策任务的发送UAV
+                else:
+                    # Job的所有task都执行完，则更新状态为False
+                    self.jobs[j].status = False
+                    self.jobs[j].finish = True
+            # 任务完成奖励值
+            if self.jobs[j].finish and self.jobs[j].deadline >= 0:
+                self.reward_job_success += 1
+                self.cost_penalty += -10
+            elif self.jobs[j].finish:
+                self.cost_penalty += -5
+            else:
+                # 更新deadline（无论是否被执行，deadline都要减1）
+                self.jobs[j].deadline -= self.slot
+                # 任务超时惩罚：仅在首次超时越界时施加一次固定惩罚
+                if self.jobs[j].deadline < 0:
+                    # 使用动态属性标记是否已经对该 job 施加超时惩罚
+                    if not hasattr(self.jobs[j], 'timeout_flag') or not self.jobs[j].timeout_flag:
+                        self.cost_penalty += self.timeout_penalty
+                        self.jobs[j].timeout_flag = True
+
+        # 推进任务状态、uav_free_time 等
+        return self.get_state()
 
     # 更新匈牙利算法之后的状态，并返回卸载的成本（所有任务执行的时间成本、能耗成本）
     def update_state_hungarian(self, offload):
@@ -350,15 +412,22 @@ class Environment_1(object):
                     self.uav_free_time[u] = self.jobs[j].finish_time[i]       # 更新UAV的空闲时间点，与job下一个可决策时间点一致
                     # 只累加本次任务的增量执行时间，避免使用绝对时间导致 reward 巨大负数
                     self.cost_time += t_total
-                    self.reward_task_num += 1
 
                     # 任务完成奖励值
-                    if i == (self.jobs[j].n_task - 1):
-                        if self.job_decision_time[j] <= self.jobs[j].deadline:
-                            self.reward_job_success += 1
-                            self.penalty_task += -10
-                        else:
-                            self.penalty_task += 10
+                    if self.jobs[j].finish and self.jobs[j].deadline >= 0:
+                        self.reward_job_success += 1
+                        self.cost_penalty += -10
+                    elif self.jobs[j].finish:
+                        self.cost_penalty += -5
+                    else:
+                        # 更新deadline（无论是否被执行，deadline都要减1）
+                        self.jobs[j].deadline -= self.slot
+                        # 任务超时惩罚：仅在首次超时越界时施加一次固定惩罚
+                        if self.jobs[j].deadline < 0:
+                            # 使用动态属性标记是否已经对该 job 施加超时惩罚
+                            if not hasattr(self.jobs[j], 'timeout_flag') or not self.jobs[j].timeout_flag:
+                                self.cost_penalty += self.timeout_penalty
+                                self.jobs[j].timeout_flag = True
 
                     # 软约束--任务传输时长超过Phase A
                     time_a = self.t_tx[j] - self.alpha * self.slot
@@ -371,9 +440,9 @@ class Environment_1(object):
                     self.uav[req_u].current_energy -= e_tx
                     self.cost_energy += e_comp + e_tx
 
-            # UAV 能耗惩罚
-            if self.uav[u].current_energy < 0:
-                self.penalty_energy += 10
+            # # UAV 能耗惩罚
+            # if self.uav[u].current_energy < 0:
+            #     self.cost_penalty += 10
 
         return self.get_state()
 
@@ -406,21 +475,9 @@ class Environment_1(object):
             self.uav_feats[uav_id, 3] = np.sum(self.r_u2u[uav_id, :] > 0)
             self.uav_feats[uav_id, 4] = 1 if self.uav[uav_id].free else 0
             self.uav_feats[uav_id, 5] = sum(1 for job in self.jobs if job.uav_request[job.curr_task_id] == uav_id)
-            # if self.use_potential_reward:
-            #     self.uav_feats[uav_id, 6] = self.uav[uav_id].move_x
-            #     self.uav_feats[uav_id, 7] = self.uav[uav_id].move_y
             # 用 UAV 所在网格的动态任务负载（反映剩余任务）
             lab_idx = int(self.uav[uav_id].lab) if self.uav[uav_id].lab is not None else 0
             self.uav_feats[uav_id, 6] = self.grid_load_dynamic[lab_idx]
-            
-            # 添加热点方向信息（归一化的相对位置）
-            if self.uav_hotspots is not None and len(self.uav_hotspots) > uav_id:
-                hotspot = self.uav_hotspots[uav_id]
-                # 计算到热点的归一化方向向量（相对于地图范围）
-                dx = (hotspot[0] - self.uav[uav_id].pos[0]) / max(args_env.ranges_x, 1)
-                dy = (hotspot[1] - self.uav[uav_id].pos[1]) / max(args_env.ranges_y, 1)
-                # 如果状态维度允许，可以添加这两个特征
-                # 这里先不添加，避免改变状态维度
             if self.use_potential_reward:
                 self.uav_feats[uav_id, 7] = self.uav[uav_id].move_x
                 self.uav_feats[uav_id, 8] = self.uav[uav_id].move_y

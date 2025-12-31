@@ -113,7 +113,7 @@ def run_evaluate_asy_ddpg(epoch, time, log_dir_bp, seed):
 
 if __name__ == '__main__':
     # 训练参数
-    epoch = 200
+    epoch = 100
     time = 1
     args_env.datasets = True
 
@@ -164,4 +164,4 @@ if __name__ == '__main__':
             rewards_ddpg_1_no_penalty.append(rewards_penalty_ddpg_1_no)
             print(f"DDPG_1_no_potential: Reward = {reward_avg_evaluate_ddpg_1_no}, Time = {rewards_time_ddpg_1_no}, Energy = {rewards_energy_ddpg_1_no}, penalty = {rewards_penalty_ddpg_1_no}, task_success = {rewards_task_success_ddpg_1_no} ")
 
-        plot_uav_and_jobs(uav_file="results_data/uav_pos.txt", job_file="results_data/jobs_pos.txt", save_path="results_data/uav_jobs_plot_1.png")
+        plot_uav_and_jobs(uav_file="results_data/uav_pos.txt", job_file="results_data/jobs_pos.txt", save_path="results_data/uav_jobs_plot_2.png")

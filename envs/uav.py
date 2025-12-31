@@ -23,6 +23,8 @@ class UAV(object):
         self.send_energy_coef = args_env.send_energy_coef  # η_send
         self.turn_energy_coef = args_env.turn_energy_coef  # η_recv
 
+        self.max_energy = args_env.max_energy_uav
+
         # 表示UAV上一个时隙的移动轨迹
         self.move_x = None
         self.move_y = None
@@ -38,6 +40,7 @@ class UAV(object):
         self.pos = self.map.init_uav_position(uav_id)
         self.lab = uav_id
         self.current_energy = args_env.max_energy_uav
+        self.max_energy = args_env.max_energy_uav
         self.free = True  # UAV当前时刻是否空闲
         self.move_x = 0
         self.move_y = 0

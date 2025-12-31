@@ -4,7 +4,46 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b3f48ec2-dc91-491c-8913-15fec65aa2e6" name="Changes" comment="" />
+    <list default="true" id="b3f48ec2-dc91-491c-8913-15fec65aa2e6" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/algos/DDPG/ddpg_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG/ddpg_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/algos/DDPG/train_ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG/train_ddpg.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/algos/DDPG_1/asy_ddpg_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG_1/asy_ddpg_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/algos/DDPG_1/evaluate_asy_ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG_1/evaluate_asy_ddpg.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/algos/DDPG_1/train_asy_ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/algos/DDPG_1/train_asy_ddpg.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/envs/env.py" beforeDir="false" afterPath="$PROJECT_DIR$/envs/env.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/envs/env_1.py" beforeDir="false" afterPath="$PROJECT_DIR$/envs/env_1.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/envs/jobs.py" beforeDir="false" afterPath="$PROJECT_DIR$/envs/jobs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/envs/map.py" beforeDir="false" afterPath="$PROJECT_DIR$/envs/map.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/envs/uav.py" beforeDir="false" afterPath="$PROJECT_DIR$/envs/uav.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch199.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch199.pt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch399.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch399.pt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch599.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch599.pt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch799.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch799.pt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch999.pt" beforeDir="false" afterPath="$PROJECT_DIR$/log_bp_data/ddpg_no_potential_1/checkpoint_epoch999.pt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/contrast/20251127-111909-DDPG/events.out.tfevents.1764213549.TengmandeMacBook-Pro.local.41147.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/contrast/20251127-141532-PPO/events.out.tfevents.1764224132.TengmandeMacBook-Pro.local.43364.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/contrast/20251127-151637-PPO/events.out.tfevents.1764227797.TengmandeMacBook-Pro.local.44433.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/contrast/20251127-161659-DDPG/events.out.tfevents.1764231419.TengmandeMacBook-Pro.local.45645.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/contrast/20251127-190730-DDPG/events.out.tfevents.1764241650.TengmandeMacBook-Pro.local.47509.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/contrast30/20251129-110236-PPO/events.out.tfevents.1764385356.TengmandeMacBook-Pro.local.61037.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/contrast30/20251129-111939-DDPG/events.out.tfevents.1764386379.TengmandeMacBook-Pro.local.61456.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/ddpg_no_potential/20251208-194739-DDPG/events.out.tfevents.1765194459.TengmandeMacBook-Pro.local.15425.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/ddpg_no_potential/20251208-202423-DDPG/events.out.tfevents.1765196663.TengmandeMacBook-Pro.local.16113.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/ddpg_no_potential/20251209-125711-DDPG/events.out.tfevents.1765256231.TengmandeMacBook-Pro.local.28335.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/ddpg_no_potential_1/20251212-224549-DDPG/events.out.tfevents.1765550749.TengmandeMacBook-Pro.local.8786.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/ddpg_no_potential_1/20251213-153728-DDPG/events.out.tfevents.1765611448.TengmandeMacBook-Pro.local.26245.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/ddpg_no_potential_1/20251213-162926-DDPG/events.out.tfevents.1765614566.TengmandeMacBook-Pro.local.29308.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/log_data/ddpg_no_potential_1/20251215-114402-DDPG/events.out.tfevents.1765770242.TengmandeMacBook-Pro.local.81095.0" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/results_data/uav_jobs_plot.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/results_data/uav_jobs_plot_1.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/results_data/uav_jobs_plot_200.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/results_data/uav_jobs_plot_400.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/results_data/uav_jobs_plot_600.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/results_data/uav_jobs_plot_800.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/results_data/uav_pos.txt" beforeDir="false" afterPath="$PROJECT_DIR$/results_data/uav_pos.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/results_fig/train_ddpg_results/DDPG_Reward.png" beforeDir="false" afterPath="$PROJECT_DIR$/results_fig/train_ddpg_results/DDPG_Reward.png" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -69,7 +108,7 @@
       <recent name="$PROJECT_DIR$/log_data/ddpg" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.evaluate_asy_ddpg">
+  <component name="RunManager" selected="Python.train_asy_ddpg">
     <configuration name="evaluate_asy_ddpg" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="pythonProject" />
       <option name="ENV_FILES" value="" />
@@ -182,11 +221,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.evaluate_asy_ddpg" />
         <item itemvalue="Python.train_asy_ddpg" />
+        <item itemvalue="Python.train_ddpg" />
+        <item itemvalue="Python.evaluate_asy_ddpg" />
         <item itemvalue="Python.hotspots" />
         <item itemvalue="Python.uav_trajectory_plot" />
-        <item itemvalue="Python.train_ddpg" />
       </list>
     </recent_temporary>
   </component>

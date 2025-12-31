@@ -19,6 +19,7 @@ class Job(object):
         self.status = True  # job的状态，True表示当前时刻可以执行，False表示当前时刻不能执行
         self.finish = False  # Job是否执行完
         self.start = False  # Job是否开始执行
+        self.timeout_flag = False
 
         # ---- 任务数与静态需求 ----
         self.n_task = random.randint(args_env.n_task_min, args_env.n_task_max)  # The Number of Tasks
@@ -40,6 +41,7 @@ class Job(object):
         self.pos, self.lab = self.map.init_jobs_position(gt_id)
         self.deadline = self.deadline_max
         self.status = True
+        self.timeout_flag = False
 
         self.uav_request = [-1 for _ in range(self.n_task)]  # task的发送UAV
         self.uav_offload = [-1 for _ in range(self.n_task)]  # task的卸载UAV
